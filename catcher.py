@@ -17,7 +17,7 @@ URL_FACEBOOK = 'https://www.facebook.com/'
 URL_FACEBOOK_USER = 'https://m.facebook.com/{0}'
 RE_UID = re.compile('"([0-9]+)(?:\-[0-9]+)"')
 RE_TITLE = re.compile('<title>(.+)</title>')
-STRUCT_USER = namedtuple('User', ['uid', 'name', 'url'])
+STRUCT_USER = namedtuple('User', ['no', 'uid', 'name', 'url'])
 
 cookies = {}
 session = requests.Session()
@@ -38,18 +38,17 @@ def _set_cookie():
         cookies[cookie['name']] = cookie['value']
 
 # get single user data
-def _get_user(uid):
+def _get_user(i, uid):
     user = None
     url = URL_FACEBOOK_USER.format(uid)
     try:
         s = session.get(url, cookies=cookies)
         title = RE_TITLE.search(s.content).group(1)
-        print s.url
         if '.' not in title:
             name = title.decode('utf-8')
             url = s.url.replace('m.facebook.com', 'fb.me').replace(
                     '?_rdr', '')
-            user = STRUCT_USER(uid=uid, name=name, url=url)
+            user = STRUCT_USER(no=i, uid=uid, name=name, url=url)
     except Exception, e:
         pass
     
@@ -62,7 +61,6 @@ def connect():
         driver.get(URL_FACEBOOK)
         result = True
     except Exception, e:
-        print e
         result = False
 
     return result
@@ -115,16 +113,18 @@ def fetch_list(limit=50):
     
     results = results[:limit]
     users = []
-    for uid in results:
-        user = _get_user(uid)
+    for i, uid in enumerate(results):
+        user = _get_user(i + 1, uid)
         if user is not None:
             users.append(user)
     yield users
 
 # Print as pretty table
 def print_table(data):
-    organized = []
-    print tabulate(data)
+    headers = ['No.', 'UID', 'NAME', 'LINK']
+    table = tabulate(data, headers=headers)
+
+    print >> stdout, table
 
 def main(limit):
     global driver
