@@ -1,6 +1,6 @@
 #-*- coding: utf-8 -*-
-import urls
 import getpass
+import re
 try: import readline
 except: pass
 
@@ -9,6 +9,9 @@ from colorama import Fore, Back, Style
 from selenium import webdriver
 
 from sys import stdout, stderr
+
+URL_FACEBOOK = 'https://www.facebook.com/'
+RE_UID = re.compile('"([0-9\-]+)"')
 
 driver = None
 
@@ -24,7 +27,7 @@ def _get_source():
 def connect():
     result = False
     try:
-        driver.get(urls.Facebook.main)
+        driver.get(URL_FACEBOOK)
         result = True
     except Exception, e:
         print e
@@ -68,8 +71,14 @@ def fetch_list():
     source = _get_source()
     if 'InitialChatFriendsList' not in source:
         raise TypeError
-    else:
-        print source
+    
+    pos = source.find('InitialChatFriendsList')
+    block = source[pos:]
+    pos = block.find('26]')  # Ends with "]}.26],"
+    block = block[:pos]
+
+    results = RE_UID.findall(block)
+    print results
     
 
 def main():
@@ -103,7 +112,7 @@ def main():
         exit(1)
     print >> stdout, Fore.GREEN + 'Logged in on Facebook' + Fore.RESET
     
-    print >> stdout, Fore.CYAN + 'Getting list from Facebook' + FORE.RESET
+    print >> stdout, Fore.CYAN + 'Getting list from Facebook' + Fore.RESET
     try:
         users = fetch_list()
     except TypeError:
