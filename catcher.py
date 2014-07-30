@@ -1,6 +1,7 @@
 #-*- coding: utf-8 -*-
 import getpass
 import re
+import requests
 try: import readline
 except: pass
 
@@ -9,13 +10,17 @@ from colorama import Fore, Back, Style
 from selenium import webdriver
 
 from collections import namedtuple
-from sys import stdout, stderr
+from sys import argv, stdout, stderr
+from tabulate import tabulate
 
 URL_FACEBOOK = 'https://www.facebook.com/'
 URL_FACEBOOK_USER = 'https://m.facebook.com/{0}'
 RE_UID = re.compile('"([0-9]+)(?:\-[0-9]+)"')
-STRUCT_USER = namedtuple('User', ['uid', 'name', 'image', 'url'])
+RE_TITLE = re.compile('<title>(.+)</title>')
+STRUCT_USER = namedtuple('User', ['uid', 'name', 'url'])
 
+cookies = {}
+session = requests.Session()
 driver = None
 
 # get html source code from driver
@@ -26,9 +31,29 @@ def _get_source():
 
     return source
 
+# using a session cookie from selenium in urllib/urllib2/requests
+def _set_cookie():
+    all_cookies = driver.get_cookies()
+    for cookie in all_cookies:
+        cookies[cookie['name']] = cookie['value']
+
 # get single user data
 def _get_user(uid):
-    pass
+    user = None
+    url = URL_FACEBOOK_USER.format(uid)
+    try:
+        s = session.get(url, cookies=cookies)
+        title = RE_TITLE.search(s.content).group(1)
+        print s.url
+        if '.' not in title:
+            name = title.decode('utf-8')
+            url = s.url.replace('m.facebook.com', 'fb.me').replace(
+                    '?_rdr', '')
+            user = STRUCT_USER(uid=uid, name=name, url=url)
+    except Exception, e:
+        pass
+    
+    return user
 
 # connect to facebook
 def connect():
@@ -71,10 +96,11 @@ def login(user, password):
     else:
         result = True
 
+    _set_cookie()
     return result
 
 # Fetch all user list from InitialChatFriendsList
-def fetch_list():
+def fetch_list(limit=50):
     source = _get_source()
     if 'InitialChatFriendsList' not in source:
         raise TypeError
@@ -85,10 +111,22 @@ def fetch_list():
     block = block[:pos]
 
     results = RE_UID.findall(block)
+    yield results
+    
+    results = results[:limit]
     users = []
+    for uid in results:
+        user = _get_user(uid)
+        if user is not None:
+            users.append(user)
+    yield users
 
+# Print as pretty table
+def print_table(data):
+    organized = []
+    print tabulate(data)
 
-def main():
+def main(limit):
     global driver
 
     colorama_init()
@@ -120,13 +158,29 @@ def main():
     print >> stdout, Fore.GREEN + 'Logged in on Facebook' + Fore.RESET
     
     print >> stdout, Fore.CYAN + 'Getting list from Facebook' + Fore.RESET
+    generator = fetch_list(limit)
     try:
-        users = fetch_list()
+        users = generator.next() 
     except TypeError:
         print >> stderr, Fore.RED + 'Failed to fetch page source' + Fore.RESET
         exit(1)
     
+    cnt = len(users)
+    print >> stdout, Fore.BLUE + 'Loaded {0} users'.format(cnt) + Fore.RESET
+    
+    print >> stdout, Fore.CYAN + \
+            'Getting top {0} users detailed data..'.format(limit) + \
+            Fore.RESET
+    final = generator.next()
+    
+    print_table(final)
 
 if __name__ == '__main__':
-    main()
+    try:
+        limit = int(argv[1])
+    except:
+        print >> stderr, 'Please input first argument as Integer ' + \
+                '(Need for limit results)'
+    else:
+        main(limit=limit)
 
