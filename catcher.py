@@ -8,10 +8,13 @@ from colorama import init as colorama_init
 from colorama import Fore, Back, Style
 from selenium import webdriver
 
+from collections import namedtuple
 from sys import stdout, stderr
 
 URL_FACEBOOK = 'https://www.facebook.com/'
-RE_UID = re.compile('"([0-9\-]+)"')
+URL_FACEBOOK_USER = 'https://m.facebook.com/{0}'
+RE_UID = re.compile('"([0-9]+)(?:\-[0-9]+)"')
+STRUCT_USER = namedtuple('User', ['uid', 'name', 'image', 'url'])
 
 driver = None
 
@@ -22,6 +25,10 @@ def _get_source():
         source = driver.page_source
 
     return source
+
+# get single user data
+def _get_user(uid):
+    pass
 
 # connect to facebook
 def connect():
@@ -78,8 +85,8 @@ def fetch_list():
     block = block[:pos]
 
     results = RE_UID.findall(block)
-    print results
-    
+    users = []
+
 
 def main():
     global driver
