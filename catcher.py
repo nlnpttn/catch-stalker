@@ -12,6 +12,14 @@ from sys import stdout, stderr
 
 driver = None
 
+# get html source code from driver
+def _get_source():
+    source = ''
+    if driver is not None:
+        source = driver.page_source
+
+    return source
+
 # connect to facebook
 def connect():
     result = False
@@ -35,8 +43,34 @@ def prompt():
     return (username, password)
 
 # sign in to facebook
-def login():
-    pass
+def login(user, password):
+    result = False
+
+    # fill the inputbox
+    user_field = driver.find_element_by_id('email')
+    user_field.send_keys(user)
+    pass_field = driver.find_element_by_id('pass')
+    pass_field.send_keys(password)
+
+    # submit
+    form = driver.find_element_by_id('login_form')
+    form.submit()
+
+    if 'login.php' in driver.current_url:
+        result = False
+    else:
+        result = True
+
+    return result
+
+# Fetch all user list from InitialChatFriendsList
+def fetch_list():
+    source = _get_source()
+    if 'InitialChatFriendsList' not in source:
+        raise TypeError
+    else:
+        print source
+    
 
 def main():
     global driver
@@ -60,6 +94,22 @@ def main():
         exit(1)
 
     user, password = prompt()
+    print >> stdout, Fore.YELLOW + 'Trying to sign in on Facebook..' + \
+            Fore.RESET
+    result = login(user, password)
+    if result is False:
+        print >> stderr, Fore.RED + 'Failed to sign in to Facebook' + \
+                Fore.RESET
+        exit(1)
+    print >> stdout, Fore.GREEN + 'Logged in on Facebook' + Fore.RESET
+    
+    print >> stdout, Fore.CYAN + 'Getting list from Facebook' + FORE.RESET
+    try:
+        users = fetch_list()
+    except TypeError:
+        print >> stderr, Fore.RED + 'Failed to fetch page source' + Fore.RESET
+        exit(1)
+    
 
 if __name__ == '__main__':
     main()
